@@ -5,7 +5,7 @@
 ## Installation
 
 ```
-pip install git+https://github.com/rbassett3/mps_reader
+pip install git+https://github.com/rbassett3/smps_reader
 
 ```
 
