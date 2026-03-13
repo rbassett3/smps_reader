@@ -1,6 +1,8 @@
 from mps_reader import parse_mps_file as parse_core_file
 from mps_reader import get_fields_
 from mps_reader import reset_flags_to_false
+from pathlib import Path
+import warnings
 
 def read(path_to_smps_file, core_file=None, time_file=None,
     stoch_file=None, strict=True):
@@ -17,7 +19,7 @@ def read(path_to_smps_file, core_file=None, time_file=None,
     Otherwise, you can provide the files directly via
     keyword arguments'''
 
-    base_path = path_to_smps_file.split('.')[0]
+    base_path = path_to_smps_file.removesuffix('.'.join(Path(path_to_smps_file).suffixes))
     if core_file is None:
         core_file = base_path + ".cor"
     if time_file is None:
@@ -28,9 +30,9 @@ def read(path_to_smps_file, core_file=None, time_file=None,
     core_dict = parse_core_file(core_file, strict=strict)
     time_dict = parse_time_file(time_file, strict=strict)
     stoch_dict = parse_stoch_file(stoch_file, strict=strict)
-    assert core_dict['prob_name'] == time_dict['prob_name'] \
-      and time_dict['prob_name'] == stoch_dict['prob_name'],\
-      "Problem name inconsistent across files"
+    if core_dict['prob_name'] != time_dict['prob_name'] \
+      or time_dict['prob_name'] == stoch_dict['prob_name']:
+        warnings.warn("Problem name inconsistent across files")
     return {'core':core_dict, 'time':time_dict, 'stoch':stoch_dict}
     
 def parse_time_file(path_to_time_file, strict=True):
@@ -45,7 +47,8 @@ def parse_time_file(path_to_time_file, strict=True):
                 reset_flags_to_false(flags)
                 sec_name = line.split()[0]
                 if sec_name == "TIME":
-                    prob_name = line.split()[1]
+                    # some files don't give their problem's names >:(
+                    prob_name = line.split()[1]  if len(line.split()) > 1 else ""
                 elif sec_name == "PERIODS":
                     #assume that rows & columns are ordered
                     #by the period they are in, otherwise
@@ -81,6 +84,7 @@ def parse_time_file(path_to_time_file, strict=True):
                 #PERIOD is explicit
                 col, period, _, _, _, _ = get_fields(line)
                 periods[period]['cols'].append(col)
+    periods['format'] = 'explicit' if flags['explicit'] else 'implicit'
     periods['prob_name'] = prob_name
     return periods
 
@@ -107,7 +111,8 @@ def parse_stoch_file(path_to_stoch_file, strict=True):
                 sec_name = line.split()[0]
                 #print("In section ", sec_name) 
                 if sec_name == "STOCH":
-                    prob_name = line.split()[1]
+                    # some files don't give their problem's names >:(
+                    prob_name = line.split()[1]  if len(line.split()) > 1 else ""
                 elif sec_name == "SCENARIOS":
                     flags['in_scenarios'] = True
                     return_scenarios = True
