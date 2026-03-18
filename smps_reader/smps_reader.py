@@ -38,6 +38,7 @@ def read(path_to_smps_file, core_file=None, time_file=None,
 def parse_time_file(path_to_time_file, strict=True):
     #define the strict (or not) reader for data records
     get_fields = lambda x: get_fields_(x, strict=strict)
+    time_dict = {}
     periods = {}
     flags = {'in_periods':False, 'explicit':False, 
         'in_rows':False, 'in_columns':False}
@@ -84,9 +85,10 @@ def parse_time_file(path_to_time_file, strict=True):
                 #PERIOD is explicit
                 col, period, _, _, _, _ = get_fields(line)
                 periods[period]['cols'].append(col)
-    periods['format'] = 'explicit' if flags['explicit'] else 'implicit'
-    periods['prob_name'] = prob_name
-    return periods
+    time_dict['format'] = 'explicit' if flags['explicit'] else 'implicit'
+    time_dict['prob_name'] = prob_name
+    time_dict['periods'] = periods
+    return time_dict
 
 def parse_stoch_file(path_to_stoch_file, strict=True):
     '''Doesn't support the following sections:
@@ -116,6 +118,7 @@ def parse_stoch_file(path_to_stoch_file, strict=True):
                 elif sec_name == "SCENARIOS":
                     flags['in_scenarios'] = True
                     return_scenarios = True
+                    scenarios = {}
                 elif sec_name == "INDEP":
                     rv_type = line.split()[1]
                     assert rv_type == 'DISCRETE',\
@@ -158,21 +161,25 @@ def parse_stoch_file(path_to_stoch_file, strict=True):
                 if field1 == "SC": #this is a new scenario
                     this_scen = field2
                     #pdb.set_trace()
-                    return_dict[this_scen] = {}
-                    return_dict[this_scen]['parent'] = field3
-                    return_dict[this_scen]['prob'] = float(field4)
-                    #seems like field 6 is unused?
-                    return_dict[this_scen]['period'] = field6
-                    return_dict[this_scen]['data'] = []
+                    scenarios[this_scen] = {}
+                    scenarios[this_scen]['parent'] = field3
+                    scenarios[this_scen]['prob'] = float(field4)
+                    scenarios[this_scen]['period'] = field5
+                    #seems like field 6 is unused? In some references
+                    #it looks like field 6 may be the period. Need to
+                    #debug on more problems
+                    scenarios[this_scen]['data'] = []
                 else:
                     #more information on current scenario
                     #either
                     #type, bound, column, value
+                    #or
+                    #"" range, row, value (for range update)
                     #or 
                     #"", column, row, value (for matrices in constraints)
                     #or
-                    #"", rhs, column, value (for rhs in constraints)
-                    return_dict[this_scen]['data'].append(
+                    #"", rhs, row, value (for rhs in constraints)
+                    scenarios[this_scen]['data'].append(
                         (field1, field2, field3, float(field4)))
 
             elif flags['in_indep']:
@@ -206,7 +213,9 @@ def parse_stoch_file(path_to_stoch_file, strict=True):
                 return_dict[(this_block, period)]['col/row'].append((field2, field3))
                 return_dict[(this_block, period)]['value'].append(field4)
 
-        return_dict['scenarios'] = return_scenarios
+        return_dict['scenarios_flag'] = return_scenarios
+        if return_scenarios:
+            return_dict['scenarios'] = scenarios
         return_dict['distributions'] = return_discrete
         return_dict['prob_name'] = prob_name
         assert return_scenarios or return_discrete, "Neither distribution nor scenario representation"
