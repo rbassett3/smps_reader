@@ -53,9 +53,10 @@ def parse_time_file(path_to_time_file, strict=True):
                 elif sec_name == "PERIODS":
                     #assume that rows & columns are ordered
                     #by the period they are in, otherwise
-                    #EXPLICIT needs to be specified
-                    if len(line.split()) == 1 \
-                      or line.split()[1] == 'EXPLICIT':
+                    #EXPLICIT needs to be specified.
+                    #if not 2nd field then implicit
+                    if len(line.split()) != 1 \
+                      and line.split()[1] == 'EXPLICIT':
                         flags['explicit'] = True
                     flags['in_periods'] = True
                 elif sec_name == "ROWS":
