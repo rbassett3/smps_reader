@@ -136,6 +136,7 @@ def parse_stoch_file(path_to_stoch_file, strict=True):
                         modify_type = 'REPLACE'
                     flags['in_indep'] = True
                     return_discrete = True
+                    distrib = {}
                 elif sec_name == "BLOCKS":
                     rv_type = line.split()[1]
                     assert rv_type == 'DISCRETE',\
@@ -186,17 +187,18 @@ def parse_stoch_file(path_to_stoch_file, strict=True):
             elif flags['in_indep']:
                 field1, field2, field3, field4, field5, field6 = \
                     get_fields(line)
-                #note. period is often ''
-                col, row, period = field2, field3, field5
-                if ((col, row), period) in return_dict.keys():
-                    return_dict[(col, row, period)]\
+                #note. period is in field 5. It's often ''
+                #so I'm ignoring it for now
+                col, row = field2, field3
+                if (col, row) in distrib.keys():
+                    distrib[(col, row)]\
                       ['values'].append(float(field4))
-                    return_dict[(col, row, period)]\
-                      ['probs'].append(float(field6)) 
+                    distrib[(col, row)]\
+                      ['probs'].append(float(field5)) 
                 else:
-                    return_dict[((col, row), period)] =\
-                    {'values':[float(field4),], 'probs':[float(field6),]}
-            elif flags['in_blocks']:
+                    distrib[(col, row)] =\
+                    {'values':[float(field4),], 'probs':[float(field5),]}
+            elif flags['in_blocks']: #needs tested. I think this is not working
                 field1, field2, field3, field4, field5, field6 = \
                     get_fields(line)
                 if field1 == 'BL': #new block. 
@@ -217,7 +219,9 @@ def parse_stoch_file(path_to_stoch_file, strict=True):
         return_dict['scenarios_flag'] = return_scenarios
         if return_scenarios:
             return_dict['scenarios'] = scenarios
-        return_dict['distributions'] = return_discrete
+        return_dict['discrete_flag'] = return_discrete
+        if return_discrete:
+            return_dict['distrib'] = distrib
         return_dict['prob_name'] = prob_name
         assert return_scenarios or return_discrete, "Neither distribution nor scenario representation"
         return return_dict #returns a dictionary contaning scenarious or discrete distributions on elements.
