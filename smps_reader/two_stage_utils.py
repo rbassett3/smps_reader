@@ -214,48 +214,46 @@ def generate_scenarios_from_discrete_distribs(stoch, prob_data,\
         index_dict['var2ATind'], index_dict['var2Wind'],\
         index_dict['row2Aind'], index_dict['row2WTind']
 
-    data = np.array([np.random.choice(dist['values'],\
-        numscen,\
-        p=dist['probs'])\
-        for dist in stoch['distrib'].values()],\
-        order='F')
-        #fortran ordering b/c inner loop though rows
-
-    for scen in range(data.shape[1]):
-        for nz_ind, (row, col) in enumerate(stoch['distrib'].keys()):
-            this_scen = {
+    for scen in range(numscen):
+        prob_data['scenarios'][scen] = {
             'prob':1./numscen,
             'T': prob_data['T_root'].copy(),
             'W': prob_data['W_root'].copy(),
             'q': prob_data['q_root'].copy(),
             'r': prob_data['r_root'].copy()
             }
-            #next we loop through the data for this scenario
-            if row == obj_row:
-                #It's an objective update
-                this_scen['q'][var2Wind[col]] = data[nz_ind, scen]
-                #I am confused. The docs from haussman's website makes it clear
-                #that rhs side updates should just look like a rhs data field.
-                #but I keep seeing files that use RHS as the first entry as the data
-                #field. I will work around it below
-            elif row=='RHS' or row in core['rhs'].keys():
-                #It's a rhs update
-                try:
-                    this_scen['r'][row2WTind[col]] = data[nz_ind, scen]
-                except:
-                    breakpoint()
-            elif row in core['ranges']:
-                print("It's a range update!")
-                assert False, "Not supported yet"
-            elif col in var2Wind.keys():
-                #It's a W update
-                this_scen['W'][row2WTind[row], var2Wind[col]]\
-                    = data[nz_ind, scen]
-            elif col in var2ATind.keys():
-                #It's a T update!
-                this_scen['T'][row2WTind[row], var2ATind[col]]\
-                    = data[nz_ind, scen]
-            else:
-                print("(row, col) is", (row, col))
-                assert False, "not a recognized update!"
-    prob_data['scenarios'][scen] = this_scen
+    
+    for nz_ind, (row, col) in enumerate(stoch['distrib'].keys()):
+        #next we generate data for all scenarios for this value
+        data = np.random.choice(stoch['distrib'][(row, col)]['values'],\
+            numscen,\
+            p=stoch['distrib'][(row, col)]['probs'])
+        #next we find what kind of update it is, and then update the mats accordingly
+        if row == obj_row:
+            #It's an objective update
+            for scen in range(numscen):
+                prob_data['scenarios'][scen]['q'][var2Wind[col]] = data[scen]
+            #I am confused. The docs from haussman's website makes it clear
+            #that rhs side updates should just look like a rhs data field.
+            #but I keep seeing files that use RHS as the first entry as the data
+            #field. I will work around it below
+        elif row=='RHS' or row in core['rhs'].keys():
+            #It's a rhs update
+            for scen in range(numscen):
+                prob_data['scenarios'][scen]['r'][row2WTind[col]] = data[scen]
+        elif row in core['ranges']:
+            print("It's a range update!")
+            assert False, "Not supported yet"
+        elif col in var2Wind.keys():
+            #It's a W update
+            for scen in range(numscen):
+                prob_data['scenarios'][scen]['W'][row2WTind[row], var2Wind[col]]\
+                    = data[scen]
+        elif col in var2ATind.keys():
+            #It's a T update!
+            for scen in range(numscen):
+                prob_data['scenarios'][scen]['T'][row2WTind[row], var2ATind[col]]\
+                    = data[scen]
+        else:
+            print("(row, col) is", (row, col))
+            assert False, "not a recognized update!"
